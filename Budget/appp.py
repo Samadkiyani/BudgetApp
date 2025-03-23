@@ -6,11 +6,16 @@ import uuid
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Image Upload Function
+def save_uploaded_file(uploaded_file):
+    with open(os.path.join("images", uploaded_file.name), "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return os.path.join("images", uploaded_file.name)
 
-st.image("https://media.istockphoto.com/id/1488294044/photo/businessman-works-on-laptop-showing-business-analytics-dashboard-with-charts-metrics-and-kpi.jpg?s=612x612&w=0&k=20&c=AcxzQAe1LY4lGp0C6EQ6reI7ZkFC2ftS09yw_3BVkpk=", use_column_width=True)
+data_file = "users.csv"
+budget_file = "budget_data.csv"
 
-data_file = "budget_data.csv"
-
+# Function to hash passwords
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -30,13 +35,16 @@ data = load_users()
 
 st.title("🔐 Welcome to Samad Kiani Budget Dashboard")
 
+# Display Dashboard Image
+st.image("dashboard_banner.jpg", use_column_width=True)
+
 # Check authentication status
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
     st.session_state["username"] = ""
 
 if not st.session_state["authenticated"]:
-    menu = st.sidebar.selectbox("Menu", ["Login", "Sign Up"])
+    menu = st.sidebar.selectbox("Menu", ["Login", "Sign Up", "Forgot Password"])
     
     if menu == "Sign Up":
         st.subheader("Create a New Account")
@@ -57,7 +65,7 @@ if not st.session_state["authenticated"]:
             else:
                 st.error("Passwords do not match. Please try again.")
     
-    if menu == "Login":
+    elif menu == "Login":
         st.subheader("Login to Your Account")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
@@ -69,16 +77,31 @@ if not st.session_state["authenticated"]:
                 st.success(f"Welcome, {username}!")
                 st.session_state["authenticated"] = True
                 st.session_state["username"] = username
-                st.rerun()
-
+                st.experimental_rerun()
             else:
                 st.error("Invalid username or password. Please try again.")
+    
+    elif menu == "Forgot Password":
+        st.subheader("Reset Your Password")
+        username = st.text_input("Enter Your Username")
+        new_password = st.text_input("Enter New Password", type="password")
+        confirm_password = st.text_input("Confirm New Password", type="password")
+        
+        if st.button("Reset Password"):
+            if new_password == confirm_password:
+                if username in data["Username"].values:
+                    data.loc[data["Username"] == username, "Password"] = hash_password(new_password)
+                    save_users(data)
+                    st.success("Password reset successfully! You can now log in with your new password.")
+                else:
+                    st.error("Username not found. Please check and try again.")
+            else:
+                st.error("Passwords do not match. Please try again.")
 else:
     if st.sidebar.button("Logout"):
         st.session_state["authenticated"] = False
         st.session_state["username"] = ""
-        st.rerun()
-
+        st.experimental_rerun()
     
     st.title("💰 Budget Dashboard")
     
