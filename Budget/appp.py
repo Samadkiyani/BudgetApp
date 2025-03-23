@@ -1,116 +1,125 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns 
 import streamlit as st
+import pandas as pd
 import os
+import hashlib
 import uuid
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+data_file = "users.csv"
+budget_file = "budget_data.csv"
 
-st.image("https://media.istockphoto.com/id/1488294044/photo/businessman-works-on-laptop-showing-business-analytics-dashboard-with-charts-metrics-and-kpi.jpg?s=612x612&w=0&k=20&c=AcxzQAe1LY4lGp0C6EQ6reI7ZkFC2ftS09yw_3BVkpk=", use_container_width=True)
+# Function to hash passwords
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-data_file = "budget_data.csv"
-
-def load_data():
+# Function to load user data
+def load_users():
     if os.path.exists(data_file) and os.stat(data_file).st_size > 0:
         return pd.read_csv(data_file)
     else:
-        return pd.DataFrame(columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
+        return pd.DataFrame(columns=["Username", "Password"])
 
-def save_data(df):
+# Function to save user data
+def save_users(df):
     df.to_csv(data_file, index=False)
 
-data = load_data()
+# Load users
+data = load_users()
 
-st.title("💰 Welcome to Samad Kiani Budget Dashboard")
+st.title("🔐 Welcome to Samad Kiani Budget Dashboard")
 
-st.sidebar.header("Add a New Transaction")
+menu = st.sidebar.selectbox("Menu", ["Login", "Sign Up"])
 
-date = st.sidebar.date_input("Date")
-customer = st.sidebar.text_input("Customer Name")
-category = st.sidebar.selectbox("Category", ["Salary", "Groceries", "Bills", "Entertainment", "Transport", "Other"])
-amount = st.sidebar.slider("Amount", min_value=0, max_value=10000, step=10)
-transaction_type = st.sidebar.radio("Type", ("Income", "Expense"))
-
-if st.sidebar.button("Add Transaction"):
-    existing_customer = data[data["Customer"] == customer]
-    if not existing_customer.empty:
-        customer_id = existing_customer.iloc[0]["ID"]
-    else:
-        customer_id = str(uuid.uuid4())[:8]  
+if menu == "Sign Up":
+    st.subheader("Create a New Account")
+    new_username = st.text_input("Username")
+    new_password = st.text_input("Password", type="password")
+    confirm_password = st.text_input("Confirm Password", type="password")
     
-    new_data = pd.DataFrame([[customer_id, date, customer, category, amount, transaction_type]], columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
-    data = pd.concat([data, new_data], ignore_index=True)
-    save_data(data)
-    st.sidebar.success(f"Transaction added successfully! Customer ID: {customer_id}")
+    if st.button("Sign Up"):
+        if new_password == confirm_password:
+            if new_username in data["Username"].values:
+                st.error("Username already exists. Please choose a different one.")
+            else:
+                hashed_pw = hash_password(new_password)
+                new_user = pd.DataFrame([[new_username, hashed_pw]], columns=["Username", "Password"])
+                data = pd.concat([data, new_user], ignore_index=True)
+                save_users(data)
+                st.success("Account created successfully! You can now log in.")
+        else:
+            st.error("Passwords do not match. Please try again.")
 
-st.sidebar.header("Delete Customer Transactions")
-delete_input = st.sidebar.text_input("Enter Customer ID or Name to Delete")
-if st.sidebar.button("Delete Customer Transactions"):
-    data = data[(data["ID"] != delete_input) & (data["Customer"] != delete_input)]
-    save_data(data)
-    st.sidebar.success(f"All transactions for Customer {delete_input} deleted successfully!")
+if menu == "Login":
+    st.subheader("Login to Your Account")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        hashed_pw = hash_password(password)
+        user = data[(data["Username"] == username) & (data["Password"] == hashed_pw)]
+        if not user.empty:
+            st.success(f"Welcome, {username}!")
+            st.session_state["authenticated"] = True
+            st.session_state["username"] = username
+        else:
+            st.error("Invalid username or password. Please try again.")
 
-st.sidebar.header("Check Customer Data")
-check_customer_id = st.sidebar.text_input("Enter Customer ID to Check Transactions")
-if st.sidebar.button("Check Transactions"):
-    customer_data = data[data["ID"] == check_customer_id]
-    if not customer_data.empty:
-        st.subheader(f"Transactions for Customer ID: {check_customer_id}")
-        st.dataframe(customer_data)
-    else:
-        st.sidebar.warning("No transactions found for this Customer ID.")
+# If user is authenticated, show the budget dashboard
+if st.session_state.get("authenticated", False):
+    st.title("💰 Budget Dashboard")
+    
+    def load_budget_data():
+        if os.path.exists(budget_file) and os.stat(budget_file).st_size > 0:
+            return pd.read_csv(budget_file)
+        else:
+            return pd.DataFrame(columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
 
-st.subheader("Transaction History")
-st.dataframe(data)
+    def save_budget_data(df):
+        df.to_csv(budget_file, index=False)
 
-total_income = data[data["Type"] == "Income"]["Amount"].sum()
-total_expense = data[data["Type"] == "Expense"]["Amount"].sum()
-balance = total_income - total_expense
+    data = load_budget_data()
 
-st.subheader("Summary")
-st.write(f"**Total Income:** ${total_income:.2f}")
-st.write(f"**Total Expense:** ${total_expense:.2f}")
-st.write(f"**Balance:** ${balance:.2f}")
+    st.sidebar.header("Add a New Transaction")
+    date = st.sidebar.date_input("Date")
+    customer = st.session_state["username"]
+    category = st.sidebar.selectbox("Category", ["Salary", "Groceries", "Bills", "Entertainment", "Transport", "Other"])
+    amount = st.sidebar.slider("Amount", min_value=0, max_value=10000, step=10)
+    transaction_type = st.sidebar.radio("Type", ("Income", "Expense"))
 
-st.subheader("Expense Breakdown by Category")
-expense_data = data[data["Type"] == "Expense"].groupby("Category")["Amount"].sum().reset_index()
-if not expense_data.empty:
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.barplot(data=expense_data, x="Category", y="Amount", palette="pastel", ax=ax)
-    ax.set_ylabel("Amount ($)")
-    ax.set_title("Expense Breakdown by Category")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    if st.sidebar.button("Add Transaction"):
+        customer_id = str(uuid.uuid4())[:8]  # Generate a unique ID for each transaction
+        new_data = pd.DataFrame([[customer_id, date, customer, category, amount, transaction_type]], columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
+        data = pd.concat([data, new_data], ignore_index=True)
+        save_budget_data(data)
+        st.sidebar.success("Transaction added successfully!")
 
-st.subheader("Budget Utilization")
-customer_budget = data.groupby("Customer")["Amount"].sum().reset_index()
-if not customer_budget.empty:
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.barplot(data=customer_budget, x="Customer", y="Amount", palette="muted", ax=ax)
-    ax.set_ylabel("Total Expense ($)")
-    ax.set_title("Budget Utilization by Customer")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    st.subheader("Transaction History")
+    st.dataframe(data)
 
-st.subheader("Income vs. Expense Trend")
-data["Date"] = pd.to_datetime(data["Date"], errors='coerce')
-data = data.dropna(subset=["Date"])
-data["Month"] = data["Date"].dt.strftime('%Y-%m')
-customer_groups = data.groupby(["Month", "Type"])["Amount"].sum().unstack(fill_value=0)
+    total_income = data[data["Type"] == "Income"]["Amount"].sum()
+    total_expense = data[data["Type"] == "Expense"]["Amount"].sum()
+    balance = total_income - total_expense
 
-if not customer_groups.empty:
-    fig, ax = plt.subplots(figsize=(10, 5))
-    customer_groups.plot(kind='bar', stacked=True, ax=ax, color=["#1f77b4", "#ff7f0e"])
-    ax.set_xlabel("Month")
-    ax.set_ylabel("Amount ($)")
-    ax.set_title("Income vs. Expense Trend")
-    st.pyplot(fig)
+    st.subheader("Summary")
+    st.write(f"**Total Income:** ${total_income:.2f}")
+    st.write(f"**Total Expense:** ${total_expense:.2f}")
+    st.write(f"**Balance:** ${balance:.2f}")
 
-st.sidebar.subheader("Download Data")
-st.sidebar.download_button(
-    label="Download CSV",
-    data=data.to_csv(index=False),
-    file_name="budget_data.csv",
-    mime="text/csv"
-)
+    st.subheader("Expense Breakdown by Category")
+    expense_data = data[data["Type"] == "Expense"].groupby("Category")["Amount"].sum().reset_index()
+    if not expense_data.empty:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.barplot(data=expense_data, x="Category", y="Amount", palette="pastel", ax=ax)
+        ax.set_ylabel("Amount ($)")
+        ax.set_title("Expense Breakdown by Category")
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
 
+    st.sidebar.subheader("Download Data")
+    st.sidebar.download_button(
+        label="Download CSV",
+        data=data.to_csv(index=False),
+        file_name="budget_data.csv",
+        mime="text/csv"
+    )
