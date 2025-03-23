@@ -6,6 +6,12 @@ import uuid
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Image Upload Function
+def save_uploaded_file(uploaded_file):
+    with open(os.path.join("images", uploaded_file.name), "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return os.path.join("images", uploaded_file.name)
+
 data_file = "users.csv"
 budget_file = "budget_data.csv"
 
@@ -68,12 +74,14 @@ if not st.session_state["authenticated"]:
                 st.success(f"Welcome, {username}!")
                 st.session_state["authenticated"] = True
                 st.session_state["username"] = username
-                st.rerun()
-
+                st.experimental_rerun()
             else:
                 st.error("Invalid username or password. Please try again.")
 else:
-    st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"authenticated": False, "username": ""}))
+    if st.sidebar.button("Logout"):
+        st.session_state["authenticated"] = False
+        st.session_state["username"] = ""
+        st.experimental_rerun()
     
     st.title("💰 Budget Dashboard")
     
@@ -94,16 +102,29 @@ else:
     category = st.sidebar.selectbox("Category", ["Salary", "Groceries", "Bills", "Entertainment", "Transport", "Other"])
     amount = st.sidebar.slider("Amount", min_value=0, max_value=10000, step=10)
     transaction_type = st.sidebar.radio("Type", ("Income", "Expense"))
-
+    
+    uploaded_file = st.sidebar.file_uploader("Upload Image (Optional)", type=["png", "jpg", "jpeg"])
+    image_path = ""
+    if uploaded_file:
+        image_path = save_uploaded_file(uploaded_file)
+    
     if st.sidebar.button("Add Transaction"):
         customer_id = str(uuid.uuid4())[:8]  # Generate a unique ID for each transaction
         new_data = pd.DataFrame([[customer_id, date, customer, category, amount, transaction_type]], columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
         data = pd.concat([data, new_data], ignore_index=True)
         save_budget_data(data)
         st.sidebar.success("Transaction added successfully!")
-
+    
     st.subheader("Transaction History")
     st.dataframe(data)
+    
+    st.sidebar.subheader("Delete Transaction")
+    delete_id = st.sidebar.text_input("Enter Transaction ID to Delete")
+    if st.sidebar.button("Delete Transaction"):
+        data = data[data["ID"] != delete_id]
+        save_budget_data(data)
+        st.sidebar.success("Transaction deleted successfully!")
+        st.experimental_rerun()
 
     total_income = data[data["Type"] == "Income"]["Amount"].sum()
     total_expense = data[data["Type"] == "Expense"]["Amount"].sum()
