@@ -6,16 +6,11 @@ import uuid
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Image Upload Function
-def save_uploaded_file(uploaded_file):
-    with open(os.path.join("images", uploaded_file.name), "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    return os.path.join("images", uploaded_file.name)
 
-data_file = "users.csv"
-budget_file = "budget_data.csv"
+st.image("https://media.istockphoto.com/id/1488294044/photo/businessman-works-on-laptop-showing-business-analytics-dashboard-with-charts-metrics-and-kpi.jpg?s=612x612&w=0&k=20&c=AcxzQAe1LY4lGp0C6EQ6reI7ZkFC2ftS09yw_3BVkpk=", use_column_width=True)
 
-# Function to hash passwords
+data_file = "budget_data.csv"
+
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
