@@ -5,7 +5,7 @@ import streamlit as st
 import os
 import uuid
 
-# Load the image at the start of the dashboard
+
 st.image("https://media.istockphoto.com/id/1488294044/photo/businessman-works-on-laptop-showing-business-analytics-dashboard-with-charts-metrics-and-kpi.jpg?s=612x612&w=0&k=20&c=AcxzQAe1LY4lGp0C6EQ6reI7ZkFC2ftS09yw_3BVkpk=", use_column_width=True)
 
 data_file = "budget_data.csv"
@@ -36,7 +36,7 @@ if st.sidebar.button("Add Transaction"):
     if not existing_customer.empty:
         customer_id = existing_customer.iloc[0]["ID"]
     else:
-        customer_id = str(uuid.uuid4())[:8]  # Generate a unique ID for new customers
+        customer_id = str(uuid.uuid4())[:8]  
     
     new_data = pd.DataFrame([[customer_id, date, customer, category, amount, transaction_type]], columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
     data = pd.concat([data, new_data], ignore_index=True)
