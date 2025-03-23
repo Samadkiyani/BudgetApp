@@ -29,44 +29,51 @@ data = load_users()
 
 st.title("🔐 Welcome to Samad Kiani Budget Dashboard")
 
-menu = st.sidebar.selectbox("Menu", ["Login", "Sign Up"])
+# Check authentication status
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+    st.session_state["username"] = ""
 
-if menu == "Sign Up":
-    st.subheader("Create a New Account")
-    new_username = st.text_input("Username")
-    new_password = st.text_input("Password", type="password")
-    confirm_password = st.text_input("Confirm Password", type="password")
+if not st.session_state["authenticated"]:
+    menu = st.sidebar.selectbox("Menu", ["Login", "Sign Up"])
     
-    if st.button("Sign Up"):
-        if new_password == confirm_password:
-            if new_username in data["Username"].values:
-                st.error("Username already exists. Please choose a different one.")
+    if menu == "Sign Up":
+        st.subheader("Create a New Account")
+        new_username = st.text_input("Username")
+        new_password = st.text_input("Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
+        
+        if st.button("Sign Up"):
+            if new_password == confirm_password:
+                if new_username in data["Username"].values:
+                    st.error("Username already exists. Please choose a different one.")
+                else:
+                    hashed_pw = hash_password(new_password)
+                    new_user = pd.DataFrame([[new_username, hashed_pw]], columns=["Username", "Password"])
+                    data = pd.concat([data, new_user], ignore_index=True)
+                    save_users(data)
+                    st.success("Account created successfully! You can now log in.")
             else:
-                hashed_pw = hash_password(new_password)
-                new_user = pd.DataFrame([[new_username, hashed_pw]], columns=["Username", "Password"])
-                data = pd.concat([data, new_user], ignore_index=True)
-                save_users(data)
-                st.success("Account created successfully! You can now log in.")
-        else:
-            st.error("Passwords do not match. Please try again.")
-
-if menu == "Login":
-    st.subheader("Login to Your Account")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+                st.error("Passwords do not match. Please try again.")
     
-    if st.button("Login"):
-        hashed_pw = hash_password(password)
-        user = data[(data["Username"] == username) & (data["Password"] == hashed_pw)]
-        if not user.empty:
-            st.success(f"Welcome, {username}!")
-            st.session_state["authenticated"] = True
-            st.session_state["username"] = username
-        else:
-            st.error("Invalid username or password. Please try again.")
-
-# If user is authenticated, show the budget dashboard
-if st.session_state.get("authenticated", False):
+    if menu == "Login":
+        st.subheader("Login to Your Account")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        if st.button("Login"):
+            hashed_pw = hash_password(password)
+            user = data[(data["Username"] == username) & (data["Password"] == hashed_pw)]
+            if not user.empty:
+                st.success(f"Welcome, {username}!")
+                st.session_state["authenticated"] = True
+                st.session_state["username"] = username
+                st.experimental_rerun()
+            else:
+                st.error("Invalid username or password. Please try again.")
+else:
+    st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"authenticated": False, "username": ""}))
+    
     st.title("💰 Budget Dashboard")
     
     def load_budget_data():
