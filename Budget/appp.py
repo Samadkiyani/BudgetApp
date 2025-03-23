@@ -77,7 +77,8 @@ else:
     if st.sidebar.button("Logout"):
         st.session_state["authenticated"] = False
         st.session_state["username"] = ""
-        st.experimental_rerun()
+        st.rerun()
+
     
     st.title("💰 Budget Dashboard")
     
