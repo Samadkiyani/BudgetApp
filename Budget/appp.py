@@ -1,153 +1,108 @@
-import streamlit as st
 import pandas as pd
-import os
-import hashlib
-import uuid
 import matplotlib.pyplot as plt
-import seaborn as sns
+import seaborn as sns  # type: ignore
+import streamlit as st
+import os
+import uuid
+import hashlib
 
-# Image Upload Function
-def save_uploaded_file(uploaded_file):
-    with open(os.path.join("images", uploaded_file.name), "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    return os.path.join("images", uploaded_file.name)
+st.image("https://media.istockphoto.com/id/1488294044/photo/businessman-works-on-laptop-showing-business-analytics-dashboard-with-charts-metrics-and-kpi.jpg?s=612x612&w=0&k=20&c=AcxzQAe1LY4lGp0C6EQ6reI7ZkFC2ftS09yw_3BVkpk=", use_column_width=True)
 
-data_file = "users.csv"
-budget_file = "budget_data.csv"
+user_data_file = "users.csv"
+data_file = "budget_data.csv"
 
-# Function to hash passwords
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# Function to load user data
 def load_users():
+    if os.path.exists(user_data_file) and os.stat(user_data_file).st_size > 0:
+        return pd.read_csv(user_data_file)
+    else:
+        return pd.DataFrame(columns=["Username", "Password", "Customer ID"])
+
+def save_users(df):
+    df.to_csv(user_data_file, index=False)
+
+def load_data():
     if os.path.exists(data_file) and os.stat(data_file).st_size > 0:
         return pd.read_csv(data_file)
     else:
-        return pd.DataFrame(columns=["Username", "Password"])
+        return pd.DataFrame(columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
 
-# Function to save user data
-def save_users(df):
+def save_data(df):
     df.to_csv(data_file, index=False)
 
-# Load users
-data = load_users()
+data = load_data()
+users = load_users()
 
-st.title("🔐 Welcome to Samad Kiani Budget Dashboard")
+st.title("💰 Welcome to Samad Kiani Budget Dashboard")
 
-# Display Dashboard Image
-st.image("dashboard_banner.jpg", use_column_width=True)
-
-# Check authentication status
 if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-    st.session_state["username"] = ""
+    st.session_state.authenticated = False
+    st.session_state.username = ""
+    st.session_state.customer_id = ""
 
-if not st.session_state["authenticated"]:
-    menu = st.sidebar.selectbox("Menu", ["Login", "Sign Up", "Forgot Password"])
-    
-    if menu == "Sign Up":
-        st.subheader("Create a New Account")
-        new_username = st.text_input("Username")
-        new_password = st.text_input("Password", type="password")
-        confirm_password = st.text_input("Confirm Password", type="password")
-        
-        if st.button("Sign Up"):
-            if new_password == confirm_password:
-                if new_username in data["Username"].values:
-                    st.error("Username already exists. Please choose a different one.")
-                else:
-                    hashed_pw = hash_password(new_password)
-                    new_user = pd.DataFrame([[new_username, hashed_pw]], columns=["Username", "Password"])
-                    data = pd.concat([data, new_user], ignore_index=True)
-                    save_users(data)
-                    st.success("Account created successfully! You can now log in.")
+if not st.session_state.authenticated:
+    option = st.sidebar.selectbox("Login / Signup", ["Login", "Signup"])
+
+    if option == "Signup":
+        new_username = st.sidebar.text_input("Choose a Username")
+        new_password = st.sidebar.text_input("Choose a Password", type="password")
+        if st.sidebar.button("Sign Up"):
+            if new_username in users["Username"].values:
+                st.sidebar.error("Username already exists! Choose another.")
             else:
-                st.error("Passwords do not match. Please try again.")
-    
-    elif menu == "Login":
-        st.subheader("Login to Your Account")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        
-        if st.button("Login"):
-            hashed_pw = hash_password(password)
-            user = data[(data["Username"] == username) & (data["Password"] == hashed_pw)]
+                customer_id = str(uuid.uuid4())[:8]
+                new_user = pd.DataFrame([[new_username, hash_password(new_password), customer_id]], columns=["Username", "Password", "Customer ID"])
+                users = pd.concat([users, new_user], ignore_index=True)
+                save_users(users)
+                st.sidebar.success("Signup successful! Please log in.")
+
+    if option == "Login":
+        username = st.sidebar.text_input("Username")
+        password = st.sidebar.text_input("Password", type="password")
+        if st.sidebar.button("Login"):
+            user = users[(users["Username"] == username) & (users["Password"] == hash_password(password))]
             if not user.empty:
-                st.success(f"Welcome, {username}!")
-                st.session_state["authenticated"] = True
-                st.session_state["username"] = username
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                st.session_state.customer_id = user.iloc[0]["Customer ID"]
+                st.sidebar.success("Login successful!")
                 st.experimental_rerun()
             else:
-                st.error("Invalid username or password. Please try again.")
-    
-    elif menu == "Forgot Password":
-        st.subheader("Reset Your Password")
-        username = st.text_input("Enter Your Username")
-        new_password = st.text_input("Enter New Password", type="password")
-        confirm_password = st.text_input("Confirm New Password", type="password")
-        
-        if st.button("Reset Password"):
-            if new_password == confirm_password:
-                if username in data["Username"].values:
-                    data.loc[data["Username"] == username, "Password"] = hash_password(new_password)
-                    save_users(data)
-                    st.success("Password reset successfully! You can now log in with your new password.")
-                else:
-                    st.error("Username not found. Please check and try again.")
-            else:
-                st.error("Passwords do not match. Please try again.")
+                st.sidebar.error("Invalid username or password.")
 else:
+    st.sidebar.write(f"Logged in as: {st.session_state.username}")
     if st.sidebar.button("Logout"):
-        st.session_state["authenticated"] = False
-        st.session_state["username"] = ""
+        st.session_state.authenticated = False
+        st.session_state.username = ""
+        st.session_state.customer_id = ""
         st.experimental_rerun()
-    
-    st.title("💰 Budget Dashboard")
-    
-    def load_budget_data():
-        if os.path.exists(budget_file) and os.stat(budget_file).st_size > 0:
-            return pd.read_csv(budget_file)
-        else:
-            return pd.DataFrame(columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
-
-    def save_budget_data(df):
-        df.to_csv(budget_file, index=False)
-
-    data = load_budget_data()
 
     st.sidebar.header("Add a New Transaction")
     date = st.sidebar.date_input("Date")
-    customer = st.session_state["username"]
     category = st.sidebar.selectbox("Category", ["Salary", "Groceries", "Bills", "Entertainment", "Transport", "Other"])
     amount = st.sidebar.slider("Amount", min_value=0, max_value=10000, step=10)
     transaction_type = st.sidebar.radio("Type", ("Income", "Expense"))
-    
-    uploaded_file = st.sidebar.file_uploader("Upload Image (Optional)", type=["png", "jpg", "jpeg"])
-    image_path = ""
-    if uploaded_file:
-        image_path = save_uploaded_file(uploaded_file)
-    
-    if st.sidebar.button("Add Transaction"):
-        customer_id = str(uuid.uuid4())[:8]  # Generate a unique ID for each transaction
-        new_data = pd.DataFrame([[customer_id, date, customer, category, amount, transaction_type]], columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
-        data = pd.concat([data, new_data], ignore_index=True)
-        save_budget_data(data)
-        st.sidebar.success("Transaction added successfully!")
-    
-    st.subheader("Transaction History")
-    st.dataframe(data)
-    
-    st.sidebar.subheader("Delete Transaction")
-    delete_id = st.sidebar.text_input("Enter Transaction ID to Delete")
-    if st.sidebar.button("Delete Transaction"):
-        data = data[data["ID"] != delete_id]
-        save_budget_data(data)
-        st.sidebar.success("Transaction deleted successfully!")
-        st.experimental_rerun()
 
-    total_income = data[data["Type"] == "Income"]["Amount"].sum()
-    total_expense = data[data["Type"] == "Expense"]["Amount"].sum()
+    if st.sidebar.button("Add Transaction"):
+        new_data = pd.DataFrame([[st.session_state.customer_id, date, st.session_state.username, category, amount, transaction_type]], columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
+        data = pd.concat([data, new_data], ignore_index=True)
+        save_data(data)
+        st.sidebar.success("Transaction added successfully!")
+
+    st.sidebar.header("Delete Transactions")
+    if st.sidebar.button("Delete My Transactions"):
+        data = data[data["ID"] != st.session_state.customer_id]
+        save_data(data)
+        st.sidebar.success("All your transactions deleted successfully!")
+
+    st.subheader("Transaction History")
+    user_data = data[data["ID"] == st.session_state.customer_id]
+    st.dataframe(user_data)
+
+    total_income = user_data[user_data["Type"] == "Income"]["Amount"].sum()
+    total_expense = user_data[user_data["Type"] == "Expense"]["Amount"].sum()
     balance = total_income - total_expense
 
     st.subheader("Summary")
@@ -156,7 +111,7 @@ else:
     st.write(f"**Balance:** ${balance:.2f}")
 
     st.subheader("Expense Breakdown by Category")
-    expense_data = data[data["Type"] == "Expense"].groupby("Category")["Amount"].sum().reset_index()
+    expense_data = user_data[user_data["Type"] == "Expense"].groupby("Category")["Amount"].sum().reset_index()
     if not expense_data.empty:
         fig, ax = plt.subplots(figsize=(8, 6))
         sns.barplot(data=expense_data, x="Category", y="Amount", palette="pastel", ax=ax)
@@ -165,10 +120,24 @@ else:
         plt.xticks(rotation=45)
         st.pyplot(fig)
 
+    st.subheader("Income vs. Expense Trend")
+    user_data["Date"] = pd.to_datetime(user_data["Date"], errors='coerce')
+    user_data = user_data.dropna(subset=["Date"])
+    user_data["Month"] = user_data["Date"].dt.strftime('%Y-%m')
+    customer_groups = user_data.groupby(["Month", "Type"])["Amount"].sum().unstack(fill_value=0)
+
+    if not customer_groups.empty:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        customer_groups.plot(kind='bar', stacked=True, ax=ax, color=["#1f77b4", "#ff7f0e"])
+        ax.set_xlabel("Month")
+        ax.set_ylabel("Amount ($)")
+        ax.set_title("Income vs. Expense Trend")
+        st.pyplot(fig)
+
     st.sidebar.subheader("Download Data")
     st.sidebar.download_button(
         label="Download CSV",
-        data=data.to_csv(index=False),
+        data=user_data.to_csv(index=False),
         file_name="budget_data.csv",
         mime="text/csv"
     )
