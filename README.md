@@ -5,7 +5,7 @@
 
 
 
-Budget Tracker Dashboard - Built with Python & Google Colab
+Budget Tracker Dashboard - Built with Python & Deployed in streamlit
 As FinTech students, we often feel overshadowed by Computer Science students, believing we can’t match their technical skills. But the reality is, while we may not compete with them in coding expertise, we bring something equally powerful to the table—our ability to integrate finance, data analytics, and technology to solve real-world problems.
 This isn’t some big project—it’s just an assignment, a small step in a long journey of learning. But even with this, we’ve managed to develop something meaningful. Presenting the Budget Tracker Dashboard, built using Python and Google Colab, with the incredible guidance of Dr. Usama Arshad.
 🔹 What This Dashboard Does
