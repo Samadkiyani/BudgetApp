@@ -193,34 +193,47 @@ def main():
                     st.dataframe(df.tail())
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            # Model Training & Evaluation
+            # Model Training & Evaluation (Fixed Section)
             with st.container():
                 st.markdown('<div class="section">', unsafe_allow_html=True)
                 st.header("🤖 Step 4: Model Analysis")
                 
                 if st.button("🎓 Run Analysis", key="model_btn"):
                     df = st.session_state.data
+                    
+                    # Validate required features
+                    if not all(col in df.columns for col in ['SMA_20', 'SMA_50', 'Close']):
+                        st.error("❌ Required columns missing. Run Feature Engineering first!")
+                        return
+
                     X = df[['SMA_20', 'SMA_50']]
                     y = df['Close']
                     
+                    # Split data with index preservation
                     X_train, X_test, y_train, y_test = train_test_split(
-                        X, y, test_size=0.2, shuffle=False)
+                        X, y, test_size=0.2, shuffle=False
+                    )
                     
+                    # Train model
                     model = LinearRegression().fit(X_train, y_train)
                     st.session_state.model = model
                     
-                    # Generate and flatten predictions
-                    y_pred = model.predict(X_test).ravel()
-                    y_test_vals = y_test.to_numpy().ravel()
+                    # Generate predictions with dimension handling
+                    y_pred = model.predict(X_test).reshape(-1)  # Force 1D
+                    y_test_vals = y_test.to_numpy().reshape(-1)  # Convert to 1D array
                     
-                    # Create comparison dataframe with 1D arrays
-                    comparison_df = pd.DataFrame({
-                        'Date': X_test.index.to_numpy(),
-                        'Actual': y_test_vals,
-                        'Predicted': y_pred
-                    }).melt(id_vars='Date', var_name='Type', value_name='Price')
+                    # Create comparison dataframe with proper 1D arrays
+                    try:
+                        comparison_df = pd.DataFrame({
+                            'Date': X_test.index.to_numpy(),  # Convert index to numpy array
+                            'Actual': y_test_vals,
+                            'Predicted': y_pred
+                        }).melt(id_vars='Date', var_name='Type', value_name='Price')
+                    except Exception as e:
+                        st.error(f"❌ DataFrame creation failed: {str(e)}")
+                        return
 
-                    # Metrics cards
+                    # Display metrics
                     col1, col2 = st.columns(2)
                     with col1:
                         st.markdown(f"""
@@ -238,7 +251,7 @@ def main():
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # Interactive plot
+                    # Create interactive plot
                     fig = px.line(
                         comparison_df,
                         x='Date',
