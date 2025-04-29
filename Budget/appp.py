@@ -1,93 +1,116 @@
-import streamlit as st
 import pandas as pd
-import yfinance as yf
-import plotly.graph_objects as go
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-import requests
-from streamlit_lottie import st_lottie
+import matplotlib.pyplot as plt
+import seaborn as sns # type: ignore
+import streamlit as st
+import os
+import uuid
 
-st.set_page_config(page_title="Stock Price Predictor", layout="wide")
 
-# Custom CSS styling
-st.markdown("""
-    <style>
-        .stButton > button {background-color: #007ACC; color: white; border-radius: 5px;}
-        .stDataFrame {border: 1px solid #ccc; border-radius: 5px;}
-    </style>
-    """, unsafe_allow_html=True)  # use unsafe_allow_html to apply CSS&#8203;:contentReference[oaicite:15]{index=15}
+st.image("https://media.istockphoto.com/id/1488294044/photo/businessman-works-on-laptop-showing-business-analytics-dashboard-with-charts-metrics-and-kpi.jpg?s=612x612&w=0&k=20&c=AcxzQAe1LY4lGp0C6EQ6reI7ZkFC2ftS09yw_3BVkpk=", use_column_width=True)
 
-st.title("Stock Price Prediction App")
+data_file = "budget_data.csv"
 
-# Sidebar inputs: data source selection
-source = st.sidebar.radio("Select Data Source", ["Yahoo Finance", "CSV Upload"])
-if source == "Yahoo Finance":
-    ticker = st.sidebar.text_input("Stock Ticker", value="AAPL")
-    start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2020-01-01"))
-    end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2022-12-31"))
-    uploaded_file = None
-else:
-    uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-    ticker = None
-
-# Button to load data
-if st.button("Load Data"):
-    if source == "Yahoo Finance" and ticker:
-        # Download data from Yahoo Finance
-        data = yf.download(ticker, start=start_date, end=end_date)
-        st.success(f"Fetched data for {ticker} from {start_date} to {end_date}")
-    elif source == "CSV Upload" and uploaded_file is not None:
-        # Read uploaded CSV (streamlit gives a BytesIO)
-        data = pd.read_csv(uploaded_file, parse_dates=True, index_col=0)
-        st.success("CSV data loaded successfully")
+def load_data():
+    if os.path.exists(data_file) and os.stat(data_file).st_size > 0:
+        return pd.read_csv(data_file)
     else:
-        st.error("Please select a valid data source and input.")
-        st.stop()
+        return pd.DataFrame(columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
 
-    # Display raw data
-    st.subheader("Raw Data")
-    st.dataframe(data)
+def save_data(df):
+    df.to_csv(data_file, index=False)
 
-    # Clean data: drop missing values
-    df = data.dropna()
-    st.write("Data after dropping missing values:")
-    st.dataframe(df)
+data = load_data()
 
-    # Feature engineering: compute 20-day and 50-day SMA
-    df['SMA_20'] = df['Close'].rolling(window=20).mean()
-    df['SMA_50'] = df['Close'].rolling(window=50).mean()
-    df = df.dropna()  # drop initial rows with NaN SMAs
-    st.write("Data with SMA_20 and SMA_50:")
-    st.dataframe(df[['Close', 'SMA_20', 'SMA_50']].head(50))
+st.title("💰 Welcome to Samad Kiani Budget Dashboard")
 
-    # Split into train/test sets (80/20 split, no shuffle)&#8203;:contentReference[oaicite:16]{index=16}
-    train_df, test_df = train_test_split(df, test_size=0.2, shuffle=False)
-    X_train = train_df[['SMA_20', 'SMA_50']]
-    y_train = train_df['Close']
-    X_test = test_df[['SMA_20', 'SMA_50']]
-    y_test = test_df['Close']
+st.sidebar.header("Add a New Transaction")
 
-    # Train Linear Regression model&#8203;:contentReference[oaicite:17]{index=17}
-    model = LinearRegression()
-    model.fit(X_train, y_train)
+date = st.sidebar.date_input("Date")
+customer = st.sidebar.text_input("Customer Name")
+category = st.sidebar.selectbox("Category", ["Salary", "Groceries", "Bills", "Entertainment", "Transport", "Other"])
+amount = st.sidebar.slider("Amount", min_value=0, max_value=10000, step=10)
+transaction_type = st.sidebar.radio("Type", ("Income", "Expense"))
 
-    # Predict on test set and flatten predictions to 1D array&#8203;:contentReference[oaicite:18]{index=18}
-    y_pred = model.predict(X_test).flatten()
+if st.sidebar.button("Add Transaction"):
+    existing_customer = data[data["Customer"] == customer]
+    if not existing_customer.empty:
+        customer_id = existing_customer.iloc[0]["ID"]
+    else:
+        customer_id = str(uuid.uuid4())[:8]  # Generate a unique ID for new customers
+    
+    new_data = pd.DataFrame([[customer_id, date, customer, category, amount, transaction_type]], columns=["ID", "Date", "Customer", "Category", "Amount", "Type"])
+    data = pd.concat([data, new_data], ignore_index=True)
+    save_data(data)
+    st.sidebar.success(f"Transaction added successfully! Customer ID: {customer_id}")
 
-    # Prepare DataFrame for plotting actual vs predicted
-    result_df = pd.DataFrame({
-        "Actual": y_test.values,
-        "Predicted": y_pred
-    }, index=y_test.index)
+st.sidebar.header("Delete Customer Transactions")
+delete_input = st.sidebar.text_input("Enter Customer ID or Name to Delete")
+if st.sidebar.button("Delete Customer Transactions"):
+    data = data[(data["ID"] != delete_input) & (data["Customer"] != delete_input)]
+    save_data(data)
+    st.sidebar.success(f"All transactions for Customer {delete_input} deleted successfully!")
 
-    # Plot Actual vs Predicted line chart using Plotly
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=result_df.index, y=result_df['Actual'], name="Actual"))
-    fig.add_trace(go.Scatter(x=result_df.index, y=result_df['Predicted'], name="Predicted"))
-    fig.update_layout(title="Actual vs Predicted Close Price", xaxis_title="Date", yaxis_title="Price")
-    st.plotly_chart(fig, use_container_width=True)
+st.sidebar.header("Check Customer Data")
+check_customer_id = st.sidebar.text_input("Enter Customer ID to Check Transactions")
+if st.sidebar.button("Check Transactions"):
+    customer_data = data[data["ID"] == check_customer_id]
+    if not customer_data.empty:
+        st.subheader(f"Transactions for Customer ID: {check_customer_id}")
+        st.dataframe(customer_data)
+    else:
+        st.sidebar.warning("No transactions found for this Customer ID.")
 
-    # Show Lottie animation for success (example)
-    lottie_url = "https://assets2.lottiefiles.com/packages/lf20_q5pk6p1k.json"
-    lottie_json = requests.get(lottie_url).json()
-    st_lottie(lottie_json, height=200, key="success")  # e.g. a checkmark animation
+st.subheader("Transaction History")
+st.dataframe(data)
+
+total_income = data[data["Type"] == "Income"]["Amount"].sum()
+total_expense = data[data["Type"] == "Expense"]["Amount"].sum()
+balance = total_income - total_expense
+
+st.subheader("Summary")
+st.write(f"**Total Income:** ${total_income:.2f}")
+st.write(f"**Total Expense:** ${total_expense:.2f}")
+st.write(f"**Balance:** ${balance:.2f}")
+
+st.subheader("Expense Breakdown by Category")
+expense_data = data[data["Type"] == "Expense"].groupby("Category")["Amount"].sum().reset_index()
+if not expense_data.empty:
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.barplot(data=expense_data, x="Category", y="Amount", palette="pastel", ax=ax)
+    ax.set_ylabel("Amount ($)")
+    ax.set_title("Expense Breakdown by Category")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+st.subheader("Budget Utilization")
+customer_budget = data.groupby("Customer")["Amount"].sum().reset_index()
+if not customer_budget.empty:
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.barplot(data=customer_budget, x="Customer", y="Amount", palette="muted", ax=ax)
+    ax.set_ylabel("Total Expense ($)")
+    ax.set_title("Budget Utilization by Customer")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+st.subheader("Income vs. Expense Trend")
+data["Date"] = pd.to_datetime(data["Date"], errors='coerce')
+data = data.dropna(subset=["Date"])
+data["Month"] = data["Date"].dt.strftime('%Y-%m')
+customer_groups = data.groupby(["Month", "Type"])["Amount"].sum().unstack(fill_value=0)
+
+if not customer_groups.empty:
+    fig, ax = plt.subplots(figsize=(10, 5))
+    customer_groups.plot(kind='bar', stacked=True, ax=ax, color=["#1f77b4", "#ff7f0e"])
+    ax.set_xlabel("Month")
+    ax.set_ylabel("Amount ($)")
+    ax.set_title("Income vs. Expense Trend")
+    st.pyplot(fig)
+
+st.sidebar.subheader("Download Data")
+st.sidebar.download_button(
+    label="Download CSV",
+    data=data.to_csv(index=False),
+    file_name="budget_data.csv",
+    mime="text/csv"
+)
+
