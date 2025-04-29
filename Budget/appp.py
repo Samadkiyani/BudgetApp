@@ -41,7 +41,37 @@ ANIMATIONS = {
 # Custom CSS with modern design
 st.markdown("""
 <style>
-    /* ... [Keep existing CSS unchanged] ... */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .main {background: #f8fafc;}
+    h1 {color: #1e3a8a; animation: fadeIn 1s; font-family: 'Arial Rounded MT Bold'}
+    .stButton>button {
+        background: #4f46e5 !important;
+        color: white !important;
+        transition: all 0.3s ease !important;
+        border-radius: 10px !important;
+    }
+    .stButton>button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 6px rgba(79,70,229,0.3) !important;
+    }
+    .section {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 1.5rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        animation: fadeIn 0.8s;
+    }
+    .metric-card {
+        background: #f1f5f9;
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -192,7 +222,7 @@ def main():
                     # Generate and verify predictions
                     y_pred = model.predict(X_test)
                     
-                    # Ensure 1D arrays with explicit checks
+                    # Ensure 1D arrays
                     y_pred = np.asarray(y_pred).reshape(-1)
                     y_test_vals = np.asarray(y_test).reshape(-1)
                     
@@ -203,7 +233,10 @@ def main():
 
                     # Get aligned dates from original data
                     try:
-                        dates = df.loc[X_test.index, 'Date'].values
+                        if 'Date' in df.columns:
+                            dates = df.loc[X_test.index, 'Date'].values
+                        else:
+                            dates = X_test.index.to_numpy()
                     except KeyError:
                         dates = X_test.index.to_numpy()
 
