@@ -181,7 +181,27 @@ def main():
 
             # Combine Data
             result_df = pd.DataFrame({
-                'Date': df.iloc[y_test.index]['Date'] if 'Date' in df.columns else df.index[y_test.index],
+                # Ensure predictions are flattened
+y_pred = np.array(y_pred).flatten()
+
+# Ensure date extraction is safe and 1D
+if 'Date' in df.columns:
+    dates = df['Date'].iloc[y_test.index].reset_index(drop=True)
+else:
+    dates = pd.Series(df.index[y_test.index]).reset_index(drop=True)
+
+actuals = pd.Series(y_test.values).reset_index(drop=True)
+predicted = pd.Series(y_pred).reset_index(drop=True)
+
+comparison_df = pd.DataFrame({
+    'Date': dates,
+    'Actual': actuals,
+    'Predicted': predicted
+})
+
+# Melt the DataFrame for plotting
+result_df = comparison_df.melt(id_vars='Date', var_name='Type', value_name='Price')
+,
                 'Actual': y_test.values,
                 'Predicted': y_pred
             }).melt(id_vars='Date', var_name='Type', value_name='Price')
